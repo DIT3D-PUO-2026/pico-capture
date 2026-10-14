@@ -1,10 +1,10 @@
 [Back to README](../README.md)
 
-# Pico Capture usage guide
+# Pico Capture 0.1 Beta usage guide
 
 Record your Pico Neo 3 or stream its view to a PC over Wi-Fi, with control over resolution, frame rate, bitrate and encoder settings.
 
-Pico Capture is an experimental Android app for the Pico Neo 3. It runs in a dock panel and supports recording, streaming, or both at once.
+Pico Capture 0.1 Beta is an experimental Android app for the Pico Neo 3. It runs in a dock panel and supports recording, streaming, or both at once.
 
 > **Tested setup:** PICO Neo 3, rooted with **Magisk**, running the **Pico OS 5.9.9.0 ROM (Android 10)**. Other headset models and ROM versions have not been verified.
 
@@ -192,7 +192,7 @@ With ADB connected, install it using:
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`Build.ps1` is an optional Windows wrapper around the same Gradle build. `:app:assembleRelease` produces an unsigned release APK; use Android Studio's signed APK workflow with your own private key for distribution. Code shrinking is disabled because the root helper is launched by class name. The Play Store target-SDK lint check is excluded for this Android 10 sideloaded utility.
+`Build.ps1` is an optional Windows wrapper around the same Gradle build. `:app:assembleRelease` produces a signed release APK when the local project key is present, or an unsigned APK otherwise. See [Automatic builds](AUTO_BUILD.md) for CI signing and tagged beta releases. Code shrinking is disabled because the root helper is launched by class name. The Play Store target-SDK lint check is excluded for this Android 10 sideloaded utility.
 
 ### Signing and Git
 

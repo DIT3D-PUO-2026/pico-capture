@@ -1,8 +1,13 @@
 param(
     [string]$Sdk = $env:ANDROID_HOME,
-    [string]$Output = (Join-Path $PSScriptRoot 'PicoCapture.apk')
+    [string]$Output
 )
 $ErrorActionPreference = 'Stop'
+if (-not $Output) {
+    $versionLine = Get-Content (Join-Path $PSScriptRoot 'gradle.properties') | Where-Object { $_ -match '^appVersionName=' } | Select-Object -First 1
+    if (-not $versionLine) { throw 'appVersionName is missing from gradle.properties' }
+    $Output = Join-Path $PSScriptRoot ('PicoCapture-' + ($versionLine -split '=',2)[1].Trim() + '.apk')
+}
 $previousAndroidHome = $env:ANDROID_HOME
 try {
     if ($Sdk) { $env:ANDROID_HOME = $Sdk }

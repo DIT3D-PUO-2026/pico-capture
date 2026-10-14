@@ -15,8 +15,8 @@ public class MainActivity extends Activity {
     TextView status,info; final Handler handler=new Handler(); ArrayList<String> names=new ArrayList<>();
     final Runnable refresh=new Runnable(){public void run(){status.setText(CaptureService.status);handler.postDelayed(this,1000);}};
     public void onCreate(Bundle b){super.onCreate(b);
-        ScrollView scroll=new ScrollView(this); LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(24,20,24,24);scroll.addView(root);setContentView(scroll);
-        TextView title=new TextView(this);title.setText("Pico Capture");title.setTextSize(27);root.addView(title);
+        ScrollView scroll=new ScrollView(this); LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(24,20,24,24);scroll.addView(root);setContentView(scroll);
+        TextView title=new TextView(this);title.setText("Pico Capture " + BuildConfig.VERSION_NAME);title.setTextSize(27);root.addView(title);
         info=new TextView(this);info.setText("Root capture · recording + Wi-Fi\nPresets and custom modes. Actual FPS depends on display/app cadence and encoder support. 1080p60 tested; other modes experimental.");root.addView(info);
         mode=spinner(root,"Output",new String[]{"Record + stream","Record only","Stream only"});
         resolution=spinner(root,"Resolution",new String[]{"720p — 1280×720","1080p — 1920×1080","1440p — 2560×1440","4K — 3840×2160","Custom"});resolution.setSelection(1);

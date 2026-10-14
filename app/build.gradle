@@ -11,8 +11,8 @@ android {
         applicationId = 'net.local.picocapture'
         minSdk = 29
         targetSdk = 29
-        versionCode = 11
-        versionName = '0.11-experimental'
+        versionCode = providers.gradleProperty('appVersionCode').get().toInteger()
+        versionName = providers.gradleProperty('appVersionName').get()
     }
 
     // Preserve the locally installed app's identity without shipping its key.
@@ -28,8 +28,16 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
         release {
+            // Local and trusted CI releases use the same private project key.
+            if (localDebugKey.exists()) {
+                signingConfig = signingConfigs.debug
+            }
             // RootCapture.main is launched by name through app_process.
             minifyEnabled = false
             shrinkResources = false

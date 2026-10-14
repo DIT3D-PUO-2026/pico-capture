@@ -11,3 +11,5 @@ local.properties
 signing/
 .kotlin/
 PROJECT-NOTES.md
+dist/
+**/__pycache__/

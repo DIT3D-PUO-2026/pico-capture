@@ -1,4 +1,4 @@
-# Pico Capture
+# Pico Capture 0.1 Beta
 
 Record your Pico Neo 3 or stream its view to a PC over Wi-Fi. Runs in a dock panel with configurable resolution, FPS, bitrate and encoder settings.
 
@@ -57,6 +57,8 @@ Open the repository root containing `settings.gradle` in Android Studio and let 
 ```
 
 APK output: `app/build/outputs/apk/debug/app-debug.apk`. Keep signing keys private; updating an installed APK requires the same key.
+
+Pushes to `main` and pull requests build APKs automatically. Download them from **Actions → Build APK → Artifacts**. [Automatic builds and beta releases](docs/AUTO_BUILD.md).
 
 ## Development
 
