@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace = 'net.local.picocapture'
+    compileSdk = 36
+    buildToolsVersion = '36.0.0'
+
+    defaultConfig {
+        applicationId = 'net.local.picocapture'
+        minSdk = 29
+        targetSdk = 29
+        versionCode = 11
+        versionName = '0.11-experimental'
+    }
+
+    // Preserve the locally installed app's identity without shipping its key.
+    def localDebugKey = rootProject.file('signing/debug.keystore')
+    if (localDebugKey.exists()) {
+        signingConfigs {
+            debug {
+                storeFile = localDebugKey
+                storePassword = 'android'
+                keyAlias = 'androiddebugkey'
+                keyPassword = 'android'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // RootCapture.main is launched by name through app_process.
+            minifyEnabled = false
+            shrinkResources = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        // Sideloaded Pico OS 5.9.9 / Android 10 utility, not a Play Store build.
+        // Retain target 29 behavior; keep all other release lint checks enabled.
+        disable += 'ExpiredTargetSdkVersion'
+    }
+}

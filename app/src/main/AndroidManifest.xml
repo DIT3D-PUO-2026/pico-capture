@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <application android:label="Pico Capture" android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="true" android:allowBackup="false">
+    <activity android:name=".DockActivity" android:exported="true" android:screenOrientation="landscape" android:resizeableActivity="true" android:windowSoftInputMode="adjustResize">
+      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+      <layout android:defaultWidth="900dp" android:defaultHeight="600dp"/>
+      <meta-data android:name="pvr.2dtovr.mode" android:value="6"/>
+      <meta-data android:name="pico.vr.position" android:value="near"/>
+    </activity>
+    <service android:name=".CaptureService" android:exported="false"/>
+  </application>
+</manifest>

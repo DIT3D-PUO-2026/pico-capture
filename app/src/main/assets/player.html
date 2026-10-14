@@ -1,0 +1,70 @@
+<!doctype html>
+
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pico Capture — Live</title>
+
+<style>
+
+*{box-sizing:border-box}body{margin:0;background:#111318;color:#eef2f8;font:15px system-ui}main{max-width:1400px;margin:auto;padding:20px}header{display:flex;align-items:center;gap:12px;margin-bottom:16px}h1{font-size:22px;margin:0}header span{margin-left:auto;color:#adb7c8}.screen{background:#050609;border-radius:16px;overflow:hidden;aspect-ratio:16/9;display:grid;place-items:center}video{width:100%;height:100%;object-fit:contain}nav{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}button,select{background:#29303d;color:#fff;border:0;border-radius:10px;padding:12px 16px;font:inherit;cursor:pointer}button.primary{background:#3e8bff}section{display:flex;gap:12px;flex-wrap:wrap}.metric{background:#1d232e;padding:14px 18px;border-radius:12px;min-width:170px}.metric small{color:#98a5b9;display:block;margin-bottom:6px}.metric strong{font-size:21px}p{color:#9facc0;line-height:1.5}#message{color:#d3dded}a{color:#83b4ff}code{user-select:all}#details{font-size:12px}
+
+</style><main><header><h1>◉ Pico Capture</h1><span id="connection">Connecting…</span></header>
+
+<div class="screen"><video id="video" autoplay muted playsinline controls></video></div>
+
+<nav><button class="primary" id="reconnect">Reconnect to live</button><button id="audio">Enable sound</button><button id="fullscreen">Fullscreen</button><select id="mode"><option value="0.08">Fast · 80 ms buffer target</option><option value="0.18">Balanced · 180 ms</option><option value="0.35">Stable · 350 ms</option></select><button id="copy">Copy OBS / VLC link</button></nav>
+
+<section><div class="metric"><small>Requested / encoder FPS</small><strong id="sourcefps">—</strong></div><div class="metric"><small>Displayed frame age · estimate</small><strong id="age">—</strong></div><div class="metric"><small>Player buffer ahead</small><strong id="buffer">—</strong></div><div class="metric"><small>Browser presented FPS</small><strong id="fps">—</strong></div><div class="metric"><small>Video</small><strong id="quality">—</strong></div></section>
+
+<p id="feeds"></p><p id="message">Opening the headset's live feed…</p><p id="details">Frame age is measured from the capture timestamp to browser presentation. It excludes game rendering before capture. A weak connection can require a larger buffer.</p>
+
+</main><script>
+
+const v=document.getElementById('video'),$=id=>document.getElementById(id);let generation=0,aborter=null,ms=null,sb=null,url=null,queue=[],pending=null,parts=[],clockOffset=null,lastSync=0,presentedLast=null,frames=0,framesAt=performance.now(),frameAges=[],restarts=0,containerWebm=false,desktopUrl='/live',nativeFailed=false,nativeSelected=false,compatAvailable=false,previousCodec=null;
+
+function join(a,b){let out=new Uint8Array(a.length+b.length);out.set(a);out.set(b,a.length);return out;}
+
+function end(){if(aborter)aborter.abort();aborter=null;queue=[];pending=null;parts=[];sb=null;if(url)URL.revokeObjectURL(url);url=null;}
+
+async function syncClock(){let best=null;for(let i=0;i<5;i++){let a=performance.now(),c=await fetch('/clock',{cache:'no-store'}).then(r=>r.json()),b=performance.now();if(c.mediaUs<0)continue;let sample={rtt:b-a,offset:c.mediaUs/1000-(a+b)/2};if(!best||sample.rtt<best.rtt)best=sample;}if(best)clockOffset=best.offset;lastSync=performance.now();}
+
+function chase(){if(!sb||!v.buffered.length||v.seeking)return;let end=v.buffered.end(v.buffered.length-1),start=v.buffered.start(0),ahead=end-v.currentTime,target=Number($('mode').value);$('buffer').textContent=Math.max(0,ahead*1000).toFixed(0)+' ms';if(v.currentTime<start||ahead>Math.max(.35,target*2.5)){v.currentTime=Math.max(start,end-target);v.playbackRate=1;}else v.playbackRate=ahead>target+.035?1.05:1;}
+
+function pump(){if(!sb||sb.updating||!queue.length)return;if(queue.length>45){restart('Receiver fell behind; reconnecting to the newest frame.');return;}try{sb.appendBuffer(queue.shift());}catch(e){restart('Resetting live buffer: '+e.message);}}
+
+function feed(chunk){if(containerWebm){feedWebm(chunk);return;}pending=pending?join(pending,chunk):chunk;while(pending.length>=8){let n=new DataView(pending.buffer,pending.byteOffset,4).getUint32(0);if(n<8||n>32*1024*1024)throw Error('Invalid MP4 fragment');if(pending.length<n)return;let box=pending.slice(0,n);pending=pending.slice(n);let type=String.fromCharCode(...box.slice(4,8));parts.push(box);if(type==='moov'||type==='mdat'){let combined=new Uint8Array(parts.reduce((s,b)=>s+b.length,0)),offset=0;for(let b of parts){combined.set(b,offset);offset+=b.length;}parts=[];queue.push(combined);pump();}}}
+
+function feedWebm(chunk){pending=pending?join(pending,chunk):chunk;while(pending.length>=2){let len=1,mask=128;while(len<=8&&!(pending[0]&mask)){len++;mask>>=1;}if(len>4)throw Error('Invalid EBML element');if(pending.length<len+1)return;let type=0;for(let i=0;i<len;i++)type=type*256+pending[i];let n=1,m=128;while(n<=8&&!(pending[len]&m)){n++;m>>=1;}if(n>8)throw Error('Invalid EBML size');if(pending.length<len+n)return;let size=pending[len]&(m-1);for(let i=1;i<n;i++)size=size*256+pending[len+i];if(type===0x18538067){parts.push(pending.slice(0,len+n));pending=pending.slice(len+n);continue;}if(size>32*1024*1024)throw Error('EBML fragment too large');let total=len+n+size;if(pending.length<total)return;parts.push(pending.slice(0,total));pending=pending.slice(total);if(type===0x1654ae6b||type===0x1f43b675){let combined=new Uint8Array(parts.reduce((a,b)=>a+b.length,0)),offset=0;for(let b of parts){combined.set(b,offset);offset+=b.length;}parts=[];queue.push(combined);pump();}}}
+
+function fallback(message){if(nativeSelected&&compatAvailable&&!nativeFailed){nativeFailed=true;restart(message+" Using hardware AVC compatibility feed.");}else restart(message);}
+
+function restart(message){$('message').textContent=message;generation++;end();setTimeout(start,200);}
+
+async function start(){let mine=++generation;end();$('connection').textContent='Connecting…';clockOffset=null;frames=0;framesAt=performance.now();frameAges=[];
+
+try{let info=await fetch('/browser-info',{cache:'no-store'}).then(r=>r.json());if(mine!==generation)return;if(!info.ready){$('message').textContent=info.message||'Waiting for encoder…';setTimeout(()=>{if(mine===generation)start();},1000);return;}renderFeeds();if(previousCodec!==info.codec){nativeFailed=false;previousCodec=info.codec;}compatAvailable=info.compatibilityEncoder;let nativeSupported=!nativeFailed&&window.MediaSource&&MediaSource.isTypeSupported(info.nativeMime||info.mime),selectedMime=nativeSupported?(info.nativeMime||info.mime):info.mime,feedUrl=nativeSupported?(info.nativeUrl||'/browser.mp4'):'/browser.mp4';if(!window.MediaSource||!MediaSource.isTypeSupported(selectedMime)){throw Error('Browser cannot decode this native codec. Enable Browser compatibility encoder in Pico Capture, or select AVC.');}nativeSelected=nativeSupported;containerWebm=selectedMime.includes('webm');desktopUrl=info.codec.includes("vp")||info.codec==="video/3gpp"?info.nativeUrl:"/live";
+
+ $('quality').textContent=info.width+'×'+info.height+' · '+(nativeSupported?info.codec.replace('video/',''):'AVC compatibility');if(navigator.mediaCapabilities)navigator.mediaCapabilities.decodingInfo({type:'media-source',video:{contentType:selectedMime.replace(/codecs="([^",]+),[^"]+"/,'codecs="$1"'),width:info.width,height:info.height,bitrate:info.bitrate||12000000,framerate:info.fps||60}}).then(c=>{$('details').textContent+=' Decoder reports smooth: '+c.smooth+', power efficient: '+c.powerEfficient+'.';}).catch(()=>{});ms=new MediaSource();url=URL.createObjectURL(ms);v.src=url;v.playbackRate=1;
+
+ await new Promise(resolve=>ms.addEventListener('sourceopen',resolve,{once:true}));if(mine!==generation)return;sb=ms.addSourceBuffer(selectedMime);sb.mode='segments';sb.addEventListener('updateend',()=>{if(mine!==generation)return;chase();if(!sb.updating&&v.currentTime>6&&v.buffered.length&&v.buffered.start(0)<v.currentTime-4){try{sb.remove(0,v.currentTime-3);return;}catch(e){}}pump();});sb.addEventListener('error',()=>{if(mine===generation)fallback('Native decoder reset.');});
+
+ v.onerror=()=>{if(mine===generation)fallback('Video decoder rejected this codec.');};setTimeout(()=>{if(mine===generation&&v.readyState<2)fallback('Decoder produced no picture.');},8000);aborter=new AbortController();let response=await fetch(feedUrl,{signal:aborter.signal,cache:'no-store'});if(!response.ok)throw Error('Stream not ready ('+response.status+')');let reader=response.body.getReader();syncClock().catch(()=>{});v.play().catch(()=>{$('message').textContent='Press play to start video.';});$('connection').textContent='Live';$('message').textContent=(info.upscale&&info.upscale!=='off'?`GPU ${info.upscale==='sgsr'?(info.sgsrThreshold===4?'SGSR 1 fine edges':'SGSR 1 balanced'):info.upscale}: ${info.sourceWidth}×${info.sourceHeight} → ${info.width}×${info.height}. `:'')+'Live feed. The player skips accumulated delay rather than playing old frames.';
+
+ while(mine===generation){let {value,done}=await reader.read();if(done)break;feed(value);}if(mine===generation)restart('Stream ended; waiting for the headset.');
+
+}catch(e){if(mine!==generation||e.name==='AbortError')return;if(nativeSelected&&compatAvailable&&!nativeFailed&&['NotSupportedError','EncodingError'].includes(e.name)){fallback('Native codec was rejected.');return;}$('connection').textContent='Disconnected';$('message').textContent=e.message;setTimeout(()=>{if(mine===generation)start();},1500);}}
+
+if(v.requestVideoFrameCallback){function frame(now,metadata){frames+=presentedLast===null?1:Math.max(0,metadata.presentedFrames-presentedLast);presentedLast=metadata.presentedFrames;if(clockOffset!==null){let age=now+clockOffset-metadata.mediaTime*1000;if(age>=0&&age<10000){$('age').textContent=age.toFixed(0)+' ms';frameAges.push(age);if(frameAges.length>1800)frameAges.shift();}}if(now-framesAt>1000){$('fps').textContent=(frames*1000/(now-framesAt)).toFixed(1);frames=0;framesAt=now;}v.requestVideoFrameCallback(frame);}v.requestVideoFrameCallback(frame);}else $('age').textContent='Unavailable';
+
+setInterval(()=>{chase();if(performance.now()-lastSync>15000)syncClock().catch(()=>{});},250);
+
+$('reconnect').onclick=()=>restart('Reconnecting…');$('audio').onclick=()=>{v.muted=!v.muted;$('audio').textContent=v.muted?'Enable sound':'Mute sound';v.play().catch(()=>{});};$('fullscreen').onclick=()=>v.requestFullscreen().catch(()=>{});$('copy').onclick=()=>{let i=document.createElement('input');i.value=location.origin+desktopUrl;document.body.append(i);i.select();document.execCommand('copy');i.remove();$('copy').textContent='Link copied';};$('mode').onchange=chase;document.addEventListener('visibilitychange',()=>{if(!document.hidden)chase();});
+
+setInterval(async()=>{try{let c=await fetch("/status",{cache:"no-store"}).then(r=>r.json());$("sourcefps").textContent=c.requestedFps+" / "+c.fps;}catch(e){}},1000);
+
+window.picoMetrics=()=>({frameAges:frameAges.slice(),bufferAhead:v.buffered.length?v.buffered.end(v.buffered.length-1)-v.currentTime:null,readyState:v.readyState,currentTime:v.currentTime,width:v.videoWidth,height:v.videoHeight,clockOffset,queuedFragments:queue.length});
+
+function renderFeeds(){fetch('/inputs').then(r=>r.json()).then(i=>{let links=i.http.filter(x=>x.available).map(x=>'<a href="'+x.url+'">'+x.format+'</a>');if(i.rtspPort)links.push('RTSP TCP: rtsp://'+location.hostname+':'+i.rtspPort+'/live');$('feeds').innerHTML='Desktop feeds: '+links.join(' · ');}).catch(()=>{});}
+
+start();
+
+</script></html>
+

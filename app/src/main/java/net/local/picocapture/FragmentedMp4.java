@@ -1,0 +1,49 @@
+package net.local.picocapture;
+import java.io.*;import java.util.*;
+
+/** AVC/AAC fragmented MP4 for Media Source Extensions. One sample per fragment. */
+final class FragmentedMp4 {
+    interface Writer{void run(DataOutputStream d)throws IOException;}
+    static byte[] bytes(Writer w){try{ByteArrayOutputStream b=new ByteArrayOutputStream();w.run(new DataOutputStream(b));return b.toByteArray();}catch(IOException e){throw new IllegalStateException(e);}}
+    static byte[] join(byte[]... items){return bytes(d->{for(byte[] b:items)d.write(b);});}
+    static byte[] box(String type,byte[] body){return bytes(d->{d.writeInt(body.length+8);d.writeBytes(type);d.write(body);});}
+    static byte[] full(String type,int version,int flags,byte[] body){return box(type,join(bytes(d->d.writeInt((version<<24)|flags)),body));}
+    static void matrix(DataOutputStream d)throws IOException{for(int n:new int[]{0x10000,0,0,0,0x10000,0,0,0,0x40000000})d.writeInt(n);}
+    final int width,height;final byte[] sps,pps,vps,asc,videoConfig;final boolean audio,hevc;final String mime,videoType,audioType;long sequence=0;
+    FragmentedMp4(int w,int h,byte[] config,byte[] a){this(w,h,"video/avc",config,"audio/mp4a-latm",a);}
+    FragmentedMp4(int w,int h,String type,byte[] config,String at,byte[] a){width=w;height=h;videoType=type;audioType=at;audio=a!=null;asc=a;videoConfig=config;hevc=type.equals("video/hevc");byte[] s=null,p=null,v=null;
+        if(type.equals("video/avc")||hevc)for(byte[] n:annexB(config)){int t=hevc?(n[0]>>1)&63:n[0]&31;if(t==(hevc?33:7))s=n;if(t==(hevc?34:8))p=n;if(hevc&&t==32)v=n;}sps=s;pps=p;vps=v;
+        String codec;if(hevc){if(s==null||p==null||v==null)throw new IllegalArgumentException("Missing HEVC VPS/SPS/PPS");codec=hevcCodec(s);}else if(type.equals("video/avc")){if(s==null||p==null||s.length<4)throw new IllegalArgumentException("Missing AVC SPS/PPS");codec="avc1."+String.format(Locale.US,"%02X%02X%02X",s[1]&255,s[2]&255,s[3]&255);}else codec=type.equals("video/mp4v-es")?"mp4v.20.1":"s263";
+        mime="video/mp4; codecs=\""+codec+(audio?at.equals("audio/opus")?",opus":",mp4a.40.2":"")+"\"";
+    }
+    static byte[] rbsp(byte[] n){return bytes(d->{for(int i=2;i<n.length;i++){if(i>=4&&n[i]==3&&n[i-1]==0&&n[i-2]==0)continue;d.writeByte(n[i]);}});}
+    static class Bits{byte[] b;int bit;Bits(byte[] b){this.b=b;}long read(int n){long v=0;while(n-->0){v=(v<<1)|((b[bit/8]>>(7-bit%8))&1);bit++;}return v;}long ue(){int zeros=0;while(read(1)==0){if(++zeros>30)throw new IllegalArgumentException("HEVC field too large");}return ((1L<<zeros)-1)+(zeros==0?0:read(zeros));}}
+    static String hevcCodec(byte[] s){Bits b=new Bits(rbsp(s));b.read(8);int space=(int)b.read(2),tier=(int)b.read(1),profile=(int)b.read(5);int compatibility=(int)b.read(32);long constraints=b.read(48);int level=(int)b.read(8);String tail=String.format(Locale.US,"%012X",constraints);while(tail.endsWith("00"))tail=tail.substring(0,tail.length()-2);return "hvc1."+(space==0?"":"ABC".substring(space-1,space))+profile+"."+Integer.toUnsignedString(Integer.reverse(compatibility),16).toUpperCase(Locale.US)+"."+(tier==0?"L":"H")+level+(tail.isEmpty()?"":"."+tail);}
+    byte[] hevcConfiguration(){byte[] r=rbsp(sps);Bits b=new Bits(r);b.read(4);int layers=(int)b.read(3)+1,nested=(int)b.read(1);b.read(96);boolean[] profiles=new boolean[layers-1],levels=new boolean[layers-1];for(int i=0;i<layers-1;i++){profiles[i]=b.read(1)!=0;levels[i]=b.read(1)!=0;}if(layers>1)b.read(2*(9-layers));for(int i=0;i<layers-1;i++){if(profiles[i])b.read(88);if(levels[i])b.read(8);}b.ue();final int chroma=(int)b.ue();if(chroma==3)b.read(1);b.ue();b.ue();if(b.read(1)!=0)for(int i=0;i<4;i++)b.ue();final int depthY=(int)b.ue(),depthC=(int)b.ue();return bytes(d->{d.writeByte(1);d.write(r,1,12);d.writeShort(0xf000);d.writeByte(0xfc);d.writeByte(0xfc|chroma);d.writeByte(0xf8|depthY);d.writeByte(0xf8|depthC);d.writeShort(0);d.writeByte((layers<<3)|(nested<<2)|3);d.writeByte(3);int t=32;for(byte[] n:new byte[][]{vps,sps,pps}){d.writeByte(0x80|t++);d.writeShort(1);d.writeShort(n.length);d.write(n);}});}
+    byte[] initialization(){byte[] ftyp=box("ftyp",bytes(d->{d.writeBytes("iso6");d.writeInt(1);d.writeBytes("iso6");d.writeBytes("isom");d.writeBytes(hevc?"hvc1":"avc1");d.writeBytes("mp41");}));
+        byte[] mvhd=full("mvhd",0,0,bytes(d->{d.writeLong(0);d.writeInt(1000000);d.writeInt(0);d.writeInt(0x10000);d.writeShort(0x100);d.write(new byte[10]);matrix(d);d.write(new byte[24]);d.writeInt(audio?3:2);}));
+        byte[] trex1=full("trex",0,0,bytes(d->{d.writeInt(1);d.writeInt(1);d.writeInt(0);d.writeInt(0);d.writeInt(0);}));byte[] trex2=full("trex",0,0,bytes(d->{d.writeInt(2);d.writeInt(1);d.writeInt(0);d.writeInt(0);d.writeInt(0);}));
+        return join(ftyp,box("moov",join(mvhd,track(false),audio?track(true):new byte[0],box("mvex",audio?join(trex1,trex2):trex1))));}
+    byte[] track(boolean a){int id=a?2:1;byte[] tkhd=full("tkhd",0,7,bytes(d->{d.writeLong(0);d.writeInt(id);d.writeInt(0);d.writeInt(0);d.writeLong(0);d.writeShort(0);d.writeShort(0);d.writeShort(a?0x100:0);d.writeShort(0);matrix(d);d.writeInt(a?0:width<<16);d.writeInt(a?0:height<<16);}));
+        byte[] mdhd=full("mdhd",0,0,bytes(d->{d.writeLong(0);d.writeInt(1000000);d.writeInt(0);d.writeShort(0x55c4);d.writeShort(0);}));
+        byte[] hdlr=full("hdlr",0,0,bytes(d->{d.writeInt(0);d.writeBytes(a?"soun":"vide");d.write(new byte[12]);d.writeBytes("Pico Capture");d.writeByte(0);}));
+        byte[] dref=full("dref",0,0,join(bytes(d->d.writeInt(1)),full("url ",0,1,new byte[0])));byte[] dinf=box("dinf",dref);
+        byte[] stsd=full("stsd",0,0,join(bytes(d->d.writeInt(1)),a?audioEntry():videoEntry()));byte[] zero=bytes(d->d.writeInt(0));
+        byte[] stbl=box("stbl",join(stsd,full("stts",0,0,zero),full("stsc",0,0,zero),full("stsz",0,0,join(zero,zero)),full("stco",0,0,zero)));
+        byte[] mediaHeader=a?full("smhd",0,0,new byte[4]):full("vmhd",0,1,new byte[8]);return box("trak",join(tkhd,box("mdia",join(mdhd,hdlr,box("minf",join(mediaHeader,dinf,stbl))))));}
+    byte[] videoEntry(){byte[] config;String entry;
+        if(hevc){entry="hvc1";config=box("hvcC",hevcConfiguration());}
+        else if(videoType.equals("video/avc")){entry="avc1";config=box("avcC",bytes(d->{d.writeByte(1);d.writeByte(sps[1]);d.writeByte(sps[2]);d.writeByte(sps[3]);d.writeByte(255);d.writeByte(225);d.writeShort(sps.length);d.write(sps);d.writeByte(1);d.writeShort(pps.length);d.write(pps);}));}
+        else if(videoType.equals("video/mp4v-es")){entry="mp4v";byte[] dec=descriptor(4,join(bytes(d->{d.writeByte(0x20);d.writeByte(0x11);d.write(new byte[3]);d.writeInt(12000000);d.writeInt(12000000);}),descriptor(5,videoConfig)));config=full("esds",0,0,descriptor(3,join(new byte[]{0,1,0},dec,descriptor(6,new byte[]{2}))));}
+        else{entry="s263";config=box("d263",new byte[]{0,0,0,0,0,45,0});}
+        return box(entry,join(bytes(d->{d.write(new byte[6]);d.writeShort(1);d.write(new byte[16]);d.writeShort(width);d.writeShort(height);d.writeInt(0x480000);d.writeInt(0x480000);d.writeInt(0);d.writeShort(1);d.write(new byte[32]);d.writeShort(24);d.writeShort(65535);}),config));}
+    static byte[] descriptor(int tag,byte[] data){return bytes(d->{d.writeByte(tag);d.writeByte(data.length);d.write(data);});}
+    byte[] audioEntry(){byte[] config;String entry="mp4a";if(audioType.equals("audio/opus")){entry="Opus";int skip=asc.length>11?(asc[10]&255)|((asc[11]&255)<<8):312;final int delay=skip;config=box("dOps",bytes(d->{d.writeByte(0);d.writeByte(2);d.writeShort(delay);d.writeInt(48000);d.writeShort(0);d.writeByte(0);}));}else{byte[] dec=descriptor(4,join(bytes(d->{d.writeByte(0x40);d.writeByte(0x15);d.write(new byte[3]);d.writeInt(128000);d.writeInt(128000);}),descriptor(5,asc)));config=full("esds",0,0,descriptor(3,join(new byte[]{0,2,0},dec,descriptor(6,new byte[]{2}))));}return box(entry,join(bytes(d->{d.write(new byte[6]);d.writeShort(1);d.writeLong(0);d.writeShort(2);d.writeShort(16);d.writeInt(0);d.writeInt(48000<<16);}),config));}
+    synchronized byte[] fragment(boolean isAudio,byte[] encoded,long ptsUs,long durationUs,boolean key){byte[] sample=isAudio||(!hevc&&!videoType.equals("video/avc"))?encoded:avcc(encoded,hevc);int track=isAudio?2:1;int flags=isAudio||key?0x02000000:0x01010000;long seq=++sequence;
+        byte[] mfhd=full("mfhd",0,0,bytes(d->d.writeInt((int)seq)));byte[] tfhd=full("tfhd",0,0x020000,bytes(d->d.writeInt(track)));byte[] tfdt=full("tfdt",1,0,bytes(d->d.writeLong(Math.max(0,ptsUs))));
+        byte[] trun0=trun(sample.length,durationUs,flags,0);byte[] moof0=box("moof",join(mfhd,box("traf",join(tfhd,tfdt,trun0))));byte[] moof=box("moof",join(mfhd,box("traf",join(tfhd,tfdt,trun(sample.length,durationUs,flags,moof0.length+8)))));return join(moof,box("mdat",sample));}
+    byte[] trun(int size,long duration,int flags,int offset){return full("trun",0,0x701,bytes(d->{d.writeInt(1);d.writeInt(offset);d.writeInt((int)Math.max(1,duration));d.writeInt(size);d.writeInt(flags);}));}
+    static byte[] avcc(byte[] data){return avcc(data,false);}
+    static byte[] avcc(byte[] data,boolean hevc){List<byte[]> nals=annexB(data);if(nals.isEmpty())throw new IllegalArgumentException("Expected Annex-B video output");return bytes(d->{for(byte[] n:nals){int t=hevc?(n[0]>>1)&63:n[0]&31;if(hevc?(t==32||t==33||t==34):(t==7||t==8))continue;d.writeInt(n.length);d.write(n);}});}
+    static List<byte[]> annexB(byte[] bytes){List<byte[]> out=new ArrayList<>();int start=-1;for(int i=0;i+2<bytes.length;i++){int n=0;if(bytes[i]==0&&bytes[i+1]==0){if(bytes[i+2]==1)n=3;else if(i+3<bytes.length&&bytes[i+2]==0&&bytes[i+3]==1)n=4;}if(n>0){if(start>=0&&i>start)out.add(Arrays.copyOfRange(bytes,start,i));start=i+n;i+=n-1;}}if(start>=0&&start<bytes.length)out.add(Arrays.copyOfRange(bytes,start,bytes.length));return out;}
+}

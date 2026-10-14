@@ -1,0 +1,8 @@
+package net.local.picocapture;
+import android.media.*;import org.json.*;
+public final class CodecInventory{
+ public static void main(String[] args)throws Exception{JSONArray list=new JSONArray();for(MediaCodecInfo c:new MediaCodecList(MediaCodecList.ALL_CODECS).getCodecInfos()){
+  JSONObject j=new JSONObject().put("name",c.getName()).put("encoder",c.isEncoder()).put("hardware",c.isHardwareAccelerated()).put("software",c.isSoftwareOnly()).put("vendor",c.isVendor()).put("alias",c.isAlias());JSONArray types=new JSONArray();
+  for(String mime:c.getSupportedTypes()){JSONObject t=new JSONObject().put("mime",mime);try{MediaCodecInfo.CodecCapabilities cap=c.getCapabilitiesForType(mime);JSONArray colors=new JSONArray();for(int f:cap.colorFormats)colors.put(f);t.put("colors",colors);boolean surface=false;for(int f:cap.colorFormats)if(f==2130708361)surface=true;t.put("surface",surface);JSONArray profiles=new JSONArray();for(MediaCodecInfo.CodecProfileLevel p:cap.profileLevels)profiles.put(new JSONObject().put("profile",p.profile).put("level",p.level));t.put("profiles",profiles);if(cap.getVideoCapabilities()!=null){MediaCodecInfo.VideoCapabilities v=cap.getVideoCapabilities();t.put("width",v.getSupportedWidths().toString()).put("height",v.getSupportedHeights().toString()).put("fps",v.getSupportedFrameRates().toString()).put("bitrate",v.getBitrateRange().toString());}if(cap.getAudioCapabilities()!=null)t.put("bitrate",cap.getAudioCapabilities().getBitrateRange().toString());}catch(Exception e){t.put("error",e.toString());}types.put(t);}j.put("types",types);list.put(j);
+ }System.out.println(list.toString(2));}
+}
