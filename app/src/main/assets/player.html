@@ -14,7 +14,7 @@
 
 <section><div class="metric"><small>Requested / encoder FPS</small><strong id="sourcefps">—</strong></div><div class="metric"><small>Displayed frame age · estimate</small><strong id="age">—</strong></div><div class="metric"><small>Player buffer ahead</small><strong id="buffer">—</strong></div><div class="metric"><small>Browser presented FPS</small><strong id="fps">—</strong></div><div class="metric"><small>Video</small><strong id="quality">—</strong></div></section>
 
-<p id="feeds"></p><p id="message">Opening the headset's live feed…</p><p id="details">Frame age is measured from the capture timestamp to browser presentation. It excludes game rendering before capture. A weak connection can require a larger buffer.</p>
+<p id="diagnostics">Waiting for connection diagnostics…</p><p id="feeds"></p><p id="message">Opening the headset's live feed…</p><p id="details">Frame age is measured from the capture timestamp to browser presentation. It excludes game rendering before capture. A weak connection can require a larger buffer. Sent bitrate is total media payload across all outputs, averaged over about two seconds; it excludes network headers. Connections count feeds, not people. Discarded chunks are queued media discarded for slow receivers, not dropped game frames.</p>
 
 </main><script>
 
@@ -58,7 +58,7 @@ setInterval(()=>{chase();if(performance.now()-lastSync>15000)syncClock().catch((
 
 $('reconnect').onclick=()=>restart('Reconnecting…');$('audio').onclick=()=>{v.muted=!v.muted;$('audio').textContent=v.muted?'Enable sound':'Mute sound';v.play().catch(()=>{});};$('fullscreen').onclick=()=>v.requestFullscreen().catch(()=>{});$('copy').onclick=()=>{let i=document.createElement('input');i.value=location.origin+desktopUrl;document.body.append(i);i.select();document.execCommand('copy');i.remove();$('copy').textContent='Link copied';};$('mode').onchange=chase;document.addEventListener('visibilitychange',()=>{if(!document.hidden)chase();});
 
-setInterval(async()=>{try{let c=await fetch("/status",{cache:"no-store"}).then(r=>r.json());$("sourcefps").textContent=c.requestedFps+" / "+c.fps;}catch(e){}},1000);
+setInterval(async()=>{try{let c=await fetch("/status",{cache:"no-store"}).then(r=>r.json());$("sourcefps").textContent=c.requestedFps+" / "+c.fps;$("diagnostics").textContent=`Encoded video: ${Number(c.videoBitrateMbps||0).toFixed(1)} Mbps · sent: ${Number(c.sentMbps||0).toFixed(1)} Mbps · connections: ${c.httpConnections||0} HTTP / ${c.rtspConnections||0} RTSP${c.udpActive?' / UDP sending':''} · queue resets: ${c.streamQueueResets||0} · discarded chunks: ${c.discardedStreamChunks||0}`;}catch(e){$("sourcefps").textContent="Unavailable";$("diagnostics").textContent="Capture status unavailable; retrying…";}},1000);
 
 window.picoMetrics=()=>({frameAges:frameAges.slice(),bufferAhead:v.buffered.length?v.buffered.end(v.buffered.length-1)-v.currentTime:null,readyState:v.readyState,currentTime:v.currentTime,width:v.videoWidth,height:v.videoHeight,clockOffset,queuedFragments:queue.length});
 

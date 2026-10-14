@@ -1,5 +1,6 @@
 """Publish authored notes and built assets, protecting existing tag targets."""
 from pathlib import Path
+import hashlib
 import json
 import os
 import re
@@ -28,6 +29,20 @@ def verify_tag(repo, tag, expected_commit):
     if obj['type'] != 'commit' or obj['sha'] != expected_commit:
         raise SystemExit('Existing release tag points to a different commit; use a new version')
 
+def public_release_assets(out, version):
+    if not re.fullmatch(r'[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?', version):
+        raise SystemExit('Invalid public release version')
+    selected = [out / ('PicoCapture-' + version + '.apk'), out / 'LICENSES.txt']
+    for path in selected:
+        if not path.is_file() or path.resolve().parent != out.resolve():
+            raise SystemExit('Required public release asset is missing or outside the build directory')
+    # The Actions bundle keeps its complete checksums. Public checksums cover only public files.
+    public = out / 'public'
+    public.mkdir(exist_ok=True)
+    checksums = public / 'SHA256SUMS.txt'
+    checksums.write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + path.name + '\n' for path in selected), encoding='utf-8')
+    return selected + [checksums]
+
 def main():
     root = Path(__file__).resolve().parents[2]
     out = root / 'dist'
@@ -44,7 +59,7 @@ def main():
     if not notes.is_file() or not notes.read_text(encoding='utf-8').strip():
         raise SystemExit('Release notes are missing')
     verify_tag(repo, tag, commit)
-    assets = [str(p) for p in sorted(out.iterdir()) if p.is_file()]
+    assets = [str(path) for path in public_release_assets(out, version)]
     subprocess.run(['gh', 'release', 'create', tag, *assets, '--target', commit,
                     '--prerelease', '--title', 'Pico Capture ' + version,
                     '--notes-file', str(notes)], check=True, cwd=root)

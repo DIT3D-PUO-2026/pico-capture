@@ -11,6 +11,7 @@ android {
         applicationId = 'net.local.picocapture'
         minSdk = 29
         targetSdk = 29
+        testInstrumentationRunner = 'net.local.picocapture.FeatureTestRunner'
         versionCode = providers.gradleProperty('appVersionCode').get().toInteger()
         versionName = providers.gradleProperty('appVersionName').get()
     }

@@ -1,8 +1,11 @@
 """Release routing and note-selection checks; no network or publishing."""
+import hashlib
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from release_notes import changelog_notes, project_version, release_requested
-from publish_release import verify_tag
+from publish_release import verify_tag, public_release_assets
 
 class ReleaseChecks(unittest.TestCase):
     def test_main_build_does_not_release(self):
@@ -54,6 +57,27 @@ class ReleaseChecks(unittest.TestCase):
     def test_annotated_tag_target(self):
         with patch('publish_release.gh_api',side_effect=[{'object':{'type':'tag','sha':'b'*40}},{'object':{'type':'commit','sha':'a'*40}}]):
             verify_tag('org/repo','v0.1-beta','a'*40)
+
+class PublicAssetChecks(unittest.TestCase):
+    def test_only_installer_licenses_and_matching_checksums_are_public(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            files = {'PicoCapture-0.1-beta.apk': b'installer', 'LICENSES.txt': b'license notice',
+                     'PicoCapture-0.1-beta-debug.apk': b'debug', 'build-info.json': b'{}',
+                     'RELEASE_NOTES.md': b'notes', 'unexpected.apk': b'extra'}
+            for name, data in files.items(): (out / name).write_bytes(data)
+            (out / 'SHA256SUMS.txt').write_text('Full Actions checksums')
+            assets = public_release_assets(out, '0.1-beta')
+            self.assertEqual([p.name for p in assets], ['PicoCapture-0.1-beta.apk','LICENSES.txt','SHA256SUMS.txt'])
+            expected = ''.join(hashlib.sha256(files[name]).hexdigest() + '  ' + name + '\n' for name in ('PicoCapture-0.1-beta.apk','LICENSES.txt'))
+            self.assertEqual(assets[-1].read_text(), expected)
+            self.assertEqual((out / 'SHA256SUMS.txt').read_text(), 'Full Actions checksums')
+
+    def test_missing_installer_blocks_publication(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            (out / 'LICENSES.txt').write_text('license')
+            with self.assertRaises(SystemExit): public_release_assets(out, '0.1-beta')
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,10 +1,10 @@
 [Back to README](../README.md)
 
-# Pico Capture 0.1 Beta usage guide
+# Pico Capture usage guide
 
 Record your Pico Neo 3 or stream its view to a PC over Wi-Fi, with control over resolution, frame rate, bitrate and encoder settings.
 
-Pico Capture 0.1 Beta is an experimental Android app for the Pico Neo 3. It runs in a dock panel and supports recording, streaming, or both at once.
+Pico Capture is an experimental Android app for the Pico Neo 3. It runs in a dock panel and supports recording, streaming, or both at once.
 
 > **Tested setup:** PICO Neo 3, rooted with **Magisk**, running the **Pico OS 5.9.9.0 ROM (Android 10)**. Other headset models and ROM versions have not been verified.
 
@@ -45,6 +45,22 @@ The app uses Pico-specific capture APIs. Compatibility with other Pico models or
 8. Tap **Stop & restore** when finished. Recordings are saved in `Movies/PicoCapture`.
 
 Opening the app does not request root; starting capture does. Stop the current session before changing its configuration. Keep the headset awake: losing source frames or taking it off can end capture.
+
+## Capture profiles
+
+Choose a profile and tap **Load** to fill the controls. This does not start capture or change a running session; Stop and Start to apply it.
+
+- **1080p60 OBS:** AVC, 12 Mbps, stream only.
+- **720p60 Browser:** AVC, 8 Mbps, stream only.
+- **1080p60 High quality:** AVC, 24 Mbps, record only.
+
+All three start with internal audio off and enhancement off. Adjust these as needed, then use **Save as…** to store a named profile on the headset. Profiles include output mode, resolution, FPS, bitrate, exact encoder, audio, GPU filter, capture scale, sharpness, ports, UDP destination and advanced encoder JSON. Saving a profile requests no root access. Up to 20 named profiles are kept across app restarts and updates; uninstalling removes them. Replace and Delete ask for confirmation. A profile with a missing encoder is rejected before changing the controls.
+
+## Connection diagnostics
+
+The dock and browser show measured encoded-video bitrate, media payload sent, active HTTP/RTSP media connections, UDP output status, queue resets and discarded queued chunks. Rates average approximately two seconds. Sent bitrate totals all outputs, including audio and any browser compatibility feed; it excludes network headers and does not measure acknowledged delivery. One person can open multiple feeds. UDP has no viewer count.
+
+Queue resets indicate that an output fell behind. Discarded chunks are queued transport or container chunks, not missing game frames. The helper does not know how many frames the game rendered or dropped. Record-only sessions show encoder bitrate with streaming disabled. An unavailable status request clears live measurements rather than leaving them looking current.
 
 ## Watch in a browser
 
@@ -132,7 +148,7 @@ AVC, HEVC and VP8 hardware encoders are available on the inspected device. Softw
 
 True 90/120 FPS, 4K60/120 and sustained performance under heavy game load remain unverified. An advertised HEVC Main10 configuration failed with Surface input; HDR/10-bit capture is not established. Capture covers the headset's viewport, not a 360° sphere.
 
-Container and desktop transport checks used FFmpeg. Chromium playback and fallback were tested. Not every codec/container combination has been checked directly in OBS or every browser. These runtime results predate the Android Studio build conversion; newly rebuilt APKs still need an on-device check.
+Container and desktop transport checks used FFmpeg. Chromium playback and fallback were tested. Not every codec/container combination has been checked directly in OBS or every browser. Earlier codec and upscaler results predate the Android Studio build conversion. The current profiles/diagnostics build also passed a 26-second AVC 1080p recording at about 60.4 FPS, simultaneous HTTP and RTSP decoding, connection cleanup and normal Stop restoration. Those streams were tested through USB port forwarding; this does not establish Wi-Fi latency or performance for other codecs. Browser diagnostics and status recovery were checked with a recorded-video fixture.
 
 ## Capture workaround and restoration
 
@@ -199,6 +215,19 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 If `signing/debug.keystore` exists locally, the debug build uses it. Otherwise, Android uses its normal local debug key. Updating an installed APK requires the same signing key that signed it.
 
 Keep signing keys private and backed up. The included `.gitignore` excludes `signing/`, keystores, `local.properties`, IDE metadata, Gradle caches and generated build output. Commit the Gradle wrapper scripts and `gradle/wrapper` files.
+
+### On-device feature checks
+
+With an awake, connected test headset and no active capture, build and install the debug APK and its test APK:
+
+```sh
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell am instrument -w net.local.picocapture.test/net.local.picocapture.FeatureTestRunner
+```
+
+On Windows, use `gradlew.bat` instead of `./gradlew`. These checks exercise profile storage, custom settings and SGSR restoration, missing-encoder rejection, rate windows, queue overflow recovery and connection counting. They briefly open and close the dock UI, use separate test preferences, and never start root capture. Live video and receiver playback still need a moving-scene check. Remove the optional test package afterward with `adb uninstall net.local.picocapture.test`.
 
 ## Troubleshooting
 

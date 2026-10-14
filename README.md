@@ -18,9 +18,11 @@ Other models and ROM versions are unverified. The capture helper checks for this
 - Record locally, stream, or do both, with optional internal audio.
 - 720p to 4K output presets, custom sizes and 30–120 FPS requests.
 - Selectable device encoders, bitrate and advanced encoder options.
+- Saved capture profiles, with starting points for OBS, browser streaming and recording.
 - Browser playback and OBS/VLC feeds over HTTP, RTSP/TCP or optional UDP.
 - Smooth, Bicubic, Sharp and Qualcomm SGSR 1 GPU enhancement.
 - Measured output FPS, session logs and **Stop & restore** for temporary capture overrides.
+- Live bitrate, connection counts and stream queue diagnostics in the dock and browser.
 
 Requested FPS is not guaranteed output. True 90/120 FPS and 4K60/120 remain unverified. SGSR is spatial upscaling, not AI or frame generation.
 
