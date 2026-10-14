@@ -1,4 +1,4 @@
-# Pico Capture 0.1 Beta
+# Pico Capture
 
 Record your Pico Neo 3 or stream its view to a PC over Wi-Fi. Runs in a dock panel with configurable resolution, FPS, bitrate and encoder settings.
 
