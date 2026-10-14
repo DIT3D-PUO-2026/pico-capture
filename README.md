@@ -2,9 +2,13 @@
 
 Record your Pico Neo 3 or stream its view to a PC over Wi-Fi, with control over resolution, frame rate, bitrate and encoder settings.
 
-Pico Capture is an experimental Android app for **rooted Pico Neo 3 headsets running Pico OS 5.9.9.0 / Android 10**. It runs in a dock panel and supports recording, streaming, or both at once.
+Pico Capture is an experimental Android app for the Pico Neo 3. It runs in a dock panel and supports recording, streaming, or both at once.
+
+> **Tested setup:** PICO Neo 3, rooted with **Magisk**, running the **Pico OS 5.9.9.0 ROM (Android 10)**. Other headset models and ROM versions have not been verified.
 
 **1080p60 capture has been demonstrated on the tested headset.** Higher settings are selectable, but actual output depends on Pico's capture cadence, the running app and the encoder. Selecting 120 FPS does not guarantee 120 unique frames per second.
+
+> **Mostly vibe coded:** Much of this app's original code was generated and refined using **OpenAI Codex / ChatGPT**. I directed the features and tested the app on my Pico Neo 3. Third-party components are credited below.
 
 ## Features
 
