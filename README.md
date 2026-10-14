@@ -58,7 +58,7 @@ Open the repository root containing `settings.gradle` in Android Studio and let 
 
 APK output: `app/build/outputs/apk/debug/app-debug.apk`. Keep signing keys private; updating an installed APK requires the same key.
 
-Pushes to `main` and pull requests build APKs automatically. Download them from **Actions → Build APK → Artifacts**. [Automatic builds and beta releases](docs/AUTO_BUILD.md).
+Pushes to `main` and pull requests build APKs automatically. A `[release]` commit on `main` or a version tag publishes a beta with its [changelog](CHANGELOG.md). [Build and release setup](docs/AUTO_BUILD.md).
 
 ## Development
 

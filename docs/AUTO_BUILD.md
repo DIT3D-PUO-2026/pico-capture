@@ -18,19 +18,37 @@ To produce updates compatible with the existing local app, add the existing sign
 
 This workflow expects the existing local debug keystore's `androiddebugkey` alias and `android` store/key passwords, as already configured in the app build. It does not use an SSH key or SSH passphrase. A differently configured keystore requires a corresponding signing configuration change.
 
-Without this secret, ordinary builds still produce an installable temporary-key debug APK and an unsigned release APK. Temporary debug keys can differ between runners, so those APKs may not update each other or the local installation. Pull requests never receive the project signing key. Tagged releases require the secret and fail rather than publishing an unsigned APK.
+Without this secret, ordinary builds still produce an installable temporary-key debug APK and an unsigned release APK. Temporary debug keys can differ between runners, so those APKs may not update each other or the local installation. Pull requests never receive the project signing key. Release commits and tagged releases require the secret; they fail if it is missing.
 
-## Publish 0.1 Beta
+## Release with your own changelog
 
-First commit and push the workflow and version changes. Then run:
+The published notes come from the matching version heading in CHANGELOG.md, not GitHub's pull-request summaries or an AI guess. The existing `## [0.1-beta]` section contains the initial beta notes.
+
+For future versions:
+
+1. Set appVersionName in gradle.properties, for example `0.1-beta.2`, and increase appVersionCode.
+2. Write the changes under `## [0.1-beta.2]` in CHANGELOG.md. An Unreleased section is for future work and is not published.
+3. Commit normally to build only, or use `[release] VERSION` as the commit subject to publish. The version must match gradle.properties.
+
+For the current 0.1 beta, commit and push from main:
+
+```powershell
+git add -A
+git commit -m "[release] 0.1-beta"
+git push origin main
+```
+
+The workflow builds, checks signing, creates the matching `v0.1-beta` tag at that exact commit, and publishes a prerelease with your authored notes and APKs. A local commit alone does not trigger Actions; it must be pushed.
+
+Alternatively, push a matching tag after a normal commit:
 
 ```powershell
 git tag v0.1-beta
 git push origin v0.1-beta
 ```
 
-After the build passes, the workflow creates a GitHub prerelease containing the signed `PicoCapture-0.1-beta.apk`, debug APK, checksums, build metadata and license notices. The organization must allow GitHub Actions and the workflow's release job to write repository contents.
+Use one release trigger per version. The release stops if the version's notes are empty/missing, the signing secret is missing, or an existing tag points to a different commit. An existing published version is not overwritten: use a new version for the next release.
 
-The tag must match the appVersionName in gradle.properties. For future versions, update appVersionName and increase appVersionCode there before tagging. Version code 12 keeps this 0.1-beta build newer than the previous local build's code 11; it is separate from the displayed version.
+The APK bundle also includes RELEASE_NOTES.md and checksums. The organization must allow Actions and the release job's repository write permission. Version code 12 keeps 0.1-beta newer than the previous local code 11; the internal code is separate from the displayed version.
 
 Automatic builds verify full debug lint, compilation, release vital lint and packaging. They do not establish recording performance or compatibility on an actual headset.

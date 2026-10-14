@@ -48,6 +48,9 @@ notices = [
 info = {'versionName': version, 'versionCode': code, 'commit': os.environ.get('GITHUB_SHA', 'local'),
         'releaseSigned': signed, 'debugSigning': 'project-key' if signed else 'temporary-local-debug-key'}
 (out / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n', encoding='utf-8')
+notes = root / 'build/release-notes.md'
+if notes.is_file():
+    shutil.copy2(notes, out / 'RELEASE_NOTES.md')
 files = sorted(p for p in out.iterdir() if p.is_file())
 (out / 'SHA256SUMS.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in files), encoding='utf-8')
 if os.environ.get('GITHUB_OUTPUT'):
