@@ -214,4 +214,4 @@ When reporting a problem, include firmware version, encoder, resolution, request
 - **SGSR 1:** Qualcomm's [Snapdragon Game Super Resolution](https://github.com/SnapdragonGameStudios/snapdragon-gsr), adapted from revision `d926f074bcb9d714e179f1ce0fcb9ee2eeb5074e`. The [BSD-3-Clause notice](app/src/main/assets/SGSR-LICENSE.txt) and [source provenance](app/src/main/assets/SGSR-provenance.json) are included. The notice is also available in the app's Advanced options.
 - **UI reference:** [Pico3dResolution](https://github.com/chaixshot/Pico3dResolution) by chaixshot. Its [MIT notice](LICENSE-UI-reference.txt) is included.
 
-This source snapshot does not yet contain a project-wide `LICENSE` file. The third-party notices above cover their respective components and must be retained.
+Pico Capture is licensed under the [MIT License](LICENSE). Third-party components retain their respective licenses and notices listed above.
